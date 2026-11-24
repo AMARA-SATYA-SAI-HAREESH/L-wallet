@@ -1,20 +1,17 @@
 # Node
 node_modules/
-
-# Expo
-.expo/
-.expo-shared/
-
-# Build output
-android/
-ios/
-web/
-
-# Logs
-npm-debug.log*
-
-# Environment
+dist/
 .env
 
-# MacOS
+# Expo
+mobile/.expo/
+mobile/android/
+mobile/ios/
+
+# Logs
+*.log
+logs/
+
+# OS
 .DS_Store
+Thumbs.db

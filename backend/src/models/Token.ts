@@ -1,20 +1,26 @@
-// src/models/Token.ts
+// backend/src/models/Token.ts
 import { Schema, model, Document } from 'mongoose';
 
 export interface IToken extends Document {
-  name: string;
   symbol: string;
-  address: string; // BEP-20 contract address
+  name: string;
   decimals: number;
+  contractAddress: string | null;
+  chainId: number;
+  isNative: boolean;
   logoUrl?: string;
+  isActive: boolean;
 }
 
-const tokenSchema = new Schema<IToken>({
-  name: { type: String, required: true },
+const TokenSchema = new Schema<IToken>({
   symbol: { type: String, required: true },
-  address: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
   decimals: { type: Number, required: true },
-  logoUrl: { type: String },
-});
+  contractAddress: { type: String, default: null },
+  chainId: { type: Number, required: true },
+  isNative: { type: Boolean, default: false },
+  logoUrl: String,
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true });
 
-export default model<IToken>('Token', tokenSchema);
+export default model<IToken>('Token', TokenSchema);

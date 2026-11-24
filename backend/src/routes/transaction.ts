@@ -1,7 +1,13 @@
-// src/routes/transaction.ts
+// backend/src/routes/transaction.ts
 import { Router } from 'express';
-import { getTransactions } from '../controllers/transactionController';
+import {
+  createTransaction, getTransactions, getTransaction,
+} from '../controllers/transactionController';
 
 const router = Router();
-router.get('/', getTransactions);
+
+router.get('/',       getTransactions);
+router.get('/:hash',  getTransaction);
+router.post('/',      createTransaction);
+
 export default router;

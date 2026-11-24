@@ -1,8 +1,10 @@
-// src/routes/swap.ts
+// backend/src/routes/swap.ts
 import { Router } from 'express';
-import { getSwapQuote, executeSwap } from '../controllers/swapController';
+import { getSwapQuoteHandler, recordSwapHandler } from '../controllers/swapController';
 
 const router = Router();
-router.post('/quote', getSwapQuote);
-router.post('/execute', executeSwap);
+
+router.post('/quote', getSwapQuoteHandler);
+router.post('/record', recordSwapHandler);
+
 export default router;
