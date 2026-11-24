@@ -1,0 +1,20 @@
+# Node
+node_modules/
+
+# Expo
+.expo/
+.expo-shared/
+
+# Build output
+android/
+ios/
+web/
+
+# Logs
+npm-debug.log*
+
+# Environment
+.env
+
+# MacOS
+.DS_Store
