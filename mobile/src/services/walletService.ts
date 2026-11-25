@@ -1,32 +1,84 @@
 // mobile/src/services/walletService.ts
 import { ethers } from 'ethers';
+import { useWalletStore, NetworkType } from '../store/walletStore';
 
-/** BSC Mainnet JSON-RPC provider (Ankr public endpoint, NodeReal as fallback) */
-const BSC_RPC_PRIMARY = 'https://rpc.ankr.com/bsc';
-const BSC_RPC_BACKUP  = 'https://bsc-dataseed.binance.org';
+export const NETWORK_CONFIG: Record<
+  NetworkType,
+  {
+    name: string;
+    chainId: number;
+    rpcUrl: string;
+    backupRpcUrl: string;
+    explorerUrl: string;
+    bscscanApi: string;
+    nativeSymbol: string;
+    tokens: {
+      BNB: { symbol: string; decimals: number; address: null };
+      USDT: { symbol: string; decimals: number; address: string };
+      USDC: { symbol: string; decimals: number; address: string };
+    };
+  }
+> = {
+  mainnet: {
+    name: 'BNB Smart Chain',
+    chainId: 56,
+    rpcUrl:
+      'https://rpc.ankr.com/bsc/65d4a1f2538cca99044e70d6d997404cd07fc45e4582f32e8ec01a7799d6ca9c',
+    backupRpcUrl: 'https://bsc-dataseed.binance.org',
+    explorerUrl: 'https://bscscan.com',
+    bscscanApi: 'https://api.bscscan.com/api',
+    nativeSymbol: 'BNB',
+    tokens: {
+      BNB: { symbol: 'BNB', decimals: 18, address: null },
+      USDT: {
+        symbol: 'USDT',
+        decimals: 18,
+        address: '0x55d398326f99059fF775485246999027B3197955',
+      },
+      USDC: {
+        symbol: 'USDC',
+        decimals: 18,
+        address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
+      },
+    },
+  },
+  testnet: {
+    name: 'BSC Testnet',
+    chainId: 97,
+    rpcUrl: 'https://data-seed-prebsc-1-s1.binance.org:8545',
+    backupRpcUrl: 'https://bsc-testnet-rpc.publicnode.com',
+    explorerUrl: 'https://testnet.bscscan.com',
+    bscscanApi: 'https://api-testnet.bscscan.com/api',
+    nativeSymbol: 'tBNB',
+    tokens: {
+      BNB: { symbol: 'tBNB', decimals: 18, address: null },
+      USDT: {
+        symbol: 'USDT',
+        decimals: 18,
+        address: '0x337610d27c682E347C9cD60BD4b3b107C9d34dDd',
+      },
+      USDC: {
+        symbol: 'USDC',
+        decimals: 18,
+        address: '0x64544969ed7EBf5f083679233325356EbE738930',
+      },
+    },
+  },
+};
 
-function getProvider(): ethers.JsonRpcProvider {
-  return new ethers.JsonRpcProvider(BSC_RPC_PRIMARY);
+export function getActiveNetwork() {
+  const net = useWalletStore.getState().network;
+  return NETWORK_CONFIG[net];
 }
 
-// ─── BEP-20 token addresses (BSC Mainnet) ───────────────────────────────────
-export const TOKENS = {
-  BNB:  { symbol: 'BNB',  decimals: 18, address: null },   // native
-  USDT: {
-    symbol: 'USDT',
-    decimals: 18,
-    address: '0x55d398326f99059fF775485246999027B3197955',
-  },
-  USDC: {
-    symbol: 'USDC',
-    decimals: 18,
-    address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
-  },
-} as const;
+function getProvider(): ethers.JsonRpcProvider {
+  const cfg = getActiveNetwork();
+  return new ethers.JsonRpcProvider(cfg.rpcUrl);
+}
 
-export type TokenSymbol = keyof typeof TOKENS;
+export type TokenSymbol = 'BNB' | 'USDT' | 'USDC';
 
-// Minimal ERC-20 ABI for balanceOf and transfer
+// Minimal ERC-20 ABI for balanceOf, transfer, estimate
 const ERC20_ABI = [
   'function balanceOf(address owner) view returns (uint256)',
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -68,11 +120,16 @@ export async function getTokenBalance(
   address: string,
   tokenSymbol: 'USDT' | 'USDC',
 ): Promise<string> {
-  const token = TOKENS[tokenSymbol];
-  const provider = getProvider();
-  const contract = new ethers.Contract(token.address!, ERC20_ABI, provider);
-  const bal = await contract.balanceOf(address);
-  return ethers.formatUnits(bal, token.decimals);
+  try {
+    const cfg = getActiveNetwork();
+    const token = cfg.tokens[tokenSymbol];
+    const provider = getProvider();
+    const contract = new ethers.Contract(token.address, ERC20_ABI, provider);
+    const bal = await contract.balanceOf(address);
+    return ethers.formatUnits(bal, token.decimals);
+  } catch {
+    return '0';
+  }
 }
 
 // ─── Send BNB ────────────────────────────────────────────────────────────────
@@ -97,10 +154,11 @@ export async function sendToken(
   amountHuman: string,
   tokenSymbol: 'USDT' | 'USDC',
 ): Promise<string> {
-  const token = TOKENS[tokenSymbol];
+  const cfg = getActiveNetwork();
+  const token = cfg.tokens[tokenSymbol];
   const provider = getProvider();
   const wallet = new ethers.Wallet(privateKey, provider);
-  const contract = new ethers.Contract(token.address!, ERC20_ABI, wallet);
+  const contract = new ethers.Contract(token.address, ERC20_ABI, wallet);
   const amount = ethers.parseUnits(amountHuman, token.decimals);
   const tx = await contract.transfer(to, amount);
   return tx.hash;
@@ -110,15 +168,32 @@ export async function sendToken(
 export async function estimateGasFee(
   fromAddress: string,
   toAddress: string,
-  amountEth: string,
+  amountHuman: string,
+  tokenSymbol: 'BNB' | 'USDT' | 'USDC' = 'BNB',
 ): Promise<{ gasCostBNB: string; gasPrice: bigint; gasLimit: bigint }> {
+  const cfg = getActiveNetwork();
   const provider = getProvider();
-  const gasPrice = (await provider.getFeeData()).gasPrice ?? ethers.parseUnits('5', 'gwei');
-  const gasLimit = await provider.estimateGas({
-    from: fromAddress,
-    to: toAddress,
-    value: ethers.parseEther(amountEth),
-  });
+  const feeData = await provider.getFeeData();
+  const gasPrice = feeData.gasPrice ?? ethers.parseUnits('3', 'gwei');
+
+  let gasLimit: bigint;
+  try {
+    if (tokenSymbol === 'BNB') {
+      gasLimit = await provider.estimateGas({
+        from: fromAddress,
+        to: toAddress,
+        value: ethers.parseEther(amountHuman || '0'),
+      });
+    } else {
+      const token = cfg.tokens[tokenSymbol];
+      const contract = new ethers.Contract(token.address, ERC20_ABI, provider);
+      const val = ethers.parseUnits(amountHuman || '0', token.decimals);
+      gasLimit = await contract.transfer.estimateGas(toAddress, val, { from: fromAddress });
+    }
+  } catch {
+    gasLimit = tokenSymbol === 'BNB' ? 21000n : 65000n;
+  }
+
   const gasCostBNB = ethers.formatEther(gasPrice * gasLimit);
   return { gasCostBNB, gasPrice, gasLimit };
 }

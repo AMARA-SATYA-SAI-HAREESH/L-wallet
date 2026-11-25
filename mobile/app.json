@@ -4,26 +4,18 @@
     "slug": "l-wallet",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#101827"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.lwallet.app"
     },
     "android": {
+      "package": "com.lwallet.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#101827"
-      },
-      "package": "com.lwallet.app"
+      }
     },
     "plugins": [
-      "expo-router",
       "expo-secure-store",
       [
         "expo-local-authentication",

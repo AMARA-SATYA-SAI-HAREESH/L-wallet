@@ -2,35 +2,54 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  TextInput, Alert,
+  TextInput, ActivityIndicator,
 } from 'react-native';
 import { storePin } from '../services/storageService';
+import { LoadingOverlay } from '../components/LoadingOverlay';
 import { COLORS } from '../constants/theme';
 
 export default function PinSetupScreen({ navigation }: any) {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const onSave = async () => {
+    setErrorMessage('');
     if (pin.length < 4) {
-      Alert.alert('Too Short', 'PIN must be at least 4 digits.');
+      setErrorMessage('PIN must be at least 4 digits.');
       return;
     }
     if (pin !== confirmPin) {
-      Alert.alert('Mismatch', 'PINs do not match. Please try again.');
+      setErrorMessage('PINs do not match. Please re-enter.');
       setConfirmPin('');
       return;
     }
-    await storePin(pin);
-    navigation.navigate('Home');
+    setSaving(true);
+    try {
+      await storePin(pin);
+      navigation.replace('Home');
+    } catch (e: any) {
+      setErrorMessage(e.message || 'Failed to save PIN.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <View style={styles.container}>
+      <LoadingOverlay visible={saving} message="Securing your wallet…" />
+
       <Text style={styles.title}>Set a PIN</Text>
       <Text style={styles.subtitle}>
         You'll use this PIN to unlock your wallet. Keep it private.
       </Text>
+
+      {errorMessage ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+        </View>
+      ) : null}
 
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Enter PIN</Text>
@@ -42,7 +61,7 @@ export default function PinSetupScreen({ navigation }: any) {
           keyboardType="numeric"
           maxLength={6}
           value={pin}
-          onChangeText={setPin}
+          onChangeText={(v) => { setPin(v); setErrorMessage(''); }}
         />
       </View>
 
@@ -56,12 +75,18 @@ export default function PinSetupScreen({ navigation }: any) {
           keyboardType="numeric"
           maxLength={6}
           value={confirmPin}
-          onChangeText={setConfirmPin}
+          onChangeText={(v) => { setConfirmPin(v); setErrorMessage(''); }}
         />
       </View>
 
-      <TouchableOpacity style={styles.primaryBtn} onPress={onSave}>
-        <Text style={styles.primaryBtnText}>Save PIN & Open Wallet →</Text>
+      <TouchableOpacity
+        style={[styles.primaryBtn, saving && styles.disabledBtn]}
+        onPress={onSave}
+        disabled={saving}
+      >
+        {saving
+          ? <ActivityIndicator color="#fff" />
+          : <Text style={styles.primaryBtnText}>Save PIN & Open Wallet →</Text>}
       </TouchableOpacity>
     </View>
   );
@@ -73,7 +98,12 @@ const styles = StyleSheet.create({
     padding: 24, justifyContent: 'center',
   },
   title: { fontSize: 26, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 10 },
-  subtitle: { fontSize: 14, color: COLORS.textSecondary, lineHeight: 22, marginBottom: 36 },
+  subtitle: { fontSize: 14, color: COLORS.textSecondary, lineHeight: 22, marginBottom: 28 },
+  errorBox: {
+    backgroundColor: '#2D0A0A', borderWidth: 1, borderColor: COLORS.error,
+    borderRadius: 10, padding: 12, marginBottom: 20,
+  },
+  errorText: { color: '#FF6B6B', fontSize: 13, textAlign: 'center' },
   inputGroup: { marginBottom: 20 },
   label: { color: COLORS.textSecondary, fontSize: 13, marginBottom: 8 },
   input: {
@@ -85,5 +115,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary, paddingVertical: 16,
     borderRadius: 12, alignItems: 'center', marginTop: 12,
   },
+  disabledBtn: { opacity: 0.6 },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

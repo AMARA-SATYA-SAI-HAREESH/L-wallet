@@ -2,24 +2,33 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Alert, Share, ScrollView,
+  Share, ScrollView,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import { getAddress } from '../services/storageService';
-import { COLORS } from '../constants/theme';
 import * as Clipboard from 'expo-clipboard';
+import { getAddress } from '../services/storageService';
+import { useWalletStore } from '../store/walletStore';
+import { COLORS } from '../constants/theme';
 
 export default function ReceiveScreen({ navigation }: any) {
+  const activeAccount = useWalletStore((s) => s.activeAccount);
   const [address, setAddress] = useState('');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    getAddress().then((a) => setAddress(a ?? ''));
-  }, []);
+    const addr = activeAccount?.address;
+    if (addr) {
+      setAddress(addr);
+    } else {
+      getAddress().then((a) => setAddress(a ?? ''));
+    }
+  }, [activeAccount?.address]);
 
   const copyAddress = async () => {
     if (!address) return;
     await Clipboard.setStringAsync(address);
-    Alert.alert('Copied', 'Wallet address copied to clipboard.');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   const shareAddress = async () => {
@@ -40,6 +49,13 @@ export default function ReceiveScreen({ navigation }: any) {
         Share your address or QR code to receive BNB, USDT, or USDC on BNB Smart Chain.
       </Text>
 
+      {/* Inline Feedback Banner when copied */}
+      {copied && (
+        <View style={styles.copiedBanner}>
+          <Text style={styles.copiedBannerText}>✅ Address copied to clipboard!</Text>
+        </View>
+      )}
+
       <View style={styles.qrContainer}>
         {address ? (
           <QRCode
@@ -58,13 +74,15 @@ export default function ReceiveScreen({ navigation }: any) {
       </View>
 
       <View style={styles.addressBox}>
-        <Text style={styles.addressLabel}>Your Wallet Address</Text>
+        <Text style={styles.addressLabel}>
+          {activeAccount?.name ? `${activeAccount.name} Address` : 'Your Wallet Address'}
+        </Text>
         <Text style={styles.addressText}>{address}</Text>
       </View>
 
       <View style={styles.actions}>
         <TouchableOpacity style={styles.copyBtn} onPress={copyAddress}>
-          <Text style={styles.copyBtnText}>📋 Copy Address</Text>
+          <Text style={styles.copyBtnText}>{copied ? '✅ Copied!' : '📋 Copy Address'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.shareBtn} onPress={shareAddress}>
           <Text style={styles.shareBtnText}>↑ Share</Text>
@@ -83,10 +101,16 @@ export default function ReceiveScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { backgroundColor: COLORS.background, padding: 20, flexGrow: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingTop: 20 },
   back: { fontSize: 24, color: COLORS.textPrimary },
   title: { fontSize: 20, fontWeight: '700', color: COLORS.textPrimary },
-  subtitle: { fontSize: 14, color: COLORS.textSecondary, lineHeight: 22, textAlign: 'center', marginBottom: 24 },
+  subtitle: { fontSize: 14, color: COLORS.textSecondary, lineHeight: 22, textAlign: 'center', marginBottom: 20 },
+  copiedBanner: {
+    backgroundColor: '#0D2B1F', paddingVertical: 8, paddingHorizontal: 14,
+    borderRadius: 8, borderWidth: 1, borderColor: COLORS.success,
+    alignItems: 'center', marginBottom: 16,
+  },
+  copiedBannerText: { color: COLORS.success, fontSize: 13, fontWeight: '600' },
   qrContainer: {
     alignSelf: 'center', backgroundColor: COLORS.card, borderRadius: 16,
     padding: 20, marginBottom: 20, borderWidth: 1, borderColor: COLORS.border,

@@ -1,17 +1,29 @@
 // mobile/src/screens/WelcomeScreen.tsx
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useWalletStore } from '../store/walletStore';
 import { COLORS } from '../constants/theme';
 
 export default function WelcomeScreen({ navigation }: any) {
+  const accounts = useWalletStore((s) => s.accounts);
+  const hasAccounts = accounts.length > 0;
+
   return (
     <View style={styles.container}>
+      {hasAccounts && (
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate('Home')}>
+          <Text style={styles.backBtnText}>← Back to Wallet</Text>
+        </TouchableOpacity>
+      )}
+
       <View style={styles.logoBox}>
         <Text style={styles.logo}>⬡</Text>
       </View>
-      <Text style={styles.title}>L Wallet</Text>
+      <Text style={styles.title}>{hasAccounts ? 'Add Account' : 'L Wallet'}</Text>
       <Text style={styles.subtitle}>
-        A simple, secure non-custodial wallet{'\n'}for BNB Smart Chain
+        {hasAccounts
+          ? 'Create a new account or import an existing recovery phrase.'
+          : 'A simple, secure non-custodial wallet\nfor BNB Smart Chain'}
       </Text>
 
       <View style={styles.buttons}>
@@ -19,14 +31,18 @@ export default function WelcomeScreen({ navigation }: any) {
           style={styles.primaryBtn}
           onPress={() => navigation.navigate('CreateWallet')}
         >
-          <Text style={styles.primaryBtnText}>Create New Wallet</Text>
+          <Text style={styles.primaryBtnText}>
+            {hasAccounts ? 'Create New Account' : 'Create New Wallet'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.secondaryBtn}
           onPress={() => navigation.navigate('ImportWallet')}
         >
-          <Text style={styles.secondaryBtnText}>Import Existing Wallet</Text>
+          <Text style={styles.secondaryBtnText}>
+            {hasAccounts ? 'Import Existing Account' : 'Import Existing Wallet'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -42,6 +58,11 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: COLORS.background,
     justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24,
   },
+  backBtn: {
+    position: 'absolute', top: 56, left: 24,
+    paddingVertical: 8, paddingHorizontal: 12,
+  },
+  backBtnText: { color: COLORS.primary, fontSize: 15, fontWeight: '600' },
   logoBox: {
     width: 80, height: 80, borderRadius: 24,
     backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center', marginBottom: 20,

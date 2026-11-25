@@ -2,12 +2,14 @@
 import 'dotenv/config';
 import { connectDB } from './config/db';
 import { createServer } from './server';
+import { startPriceRefreshJob } from './services/priceCacheService';
 import logger from './utils/logger';
 
 const PORT = process.env.PORT ?? 3000;
 
 async function main() {
   await connectDB();
+  startPriceRefreshJob();
   const app = createServer();
   app.listen(PORT, () => {
     logger.info(`L Wallet backend running on port ${PORT}`);

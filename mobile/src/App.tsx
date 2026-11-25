@@ -18,6 +18,7 @@ import SwapScreen            from './screens/SwapScreen';
 import HistoryScreen         from './screens/HistoryScreen';
 import TransactionDetailScreen from './screens/TransactionDetailScreen';
 import SettingsScreen        from './screens/SettingsScreen';
+import CoinDetailScreen      from './screens/CoinDetailScreen';
 
 export type RootStackParamList = {
   Splash:            undefined;
@@ -34,6 +35,7 @@ export type RootStackParamList = {
   History:           undefined;
   TransactionDetail: { txHash: string };
   Settings:          undefined;
+  CoinDetail:        { symbol: 'BNB' | 'USDT' | 'USDC'; balance: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -59,6 +61,7 @@ export default function App() {
         <Stack.Screen name="History"           component={HistoryScreen} />
         <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
         <Stack.Screen name="Settings"          component={SettingsScreen} />
+        <Stack.Screen name="CoinDetail"        component={CoinDetailScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -2,50 +2,78 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Alert, ScrollView,
+  ScrollView,
 } from 'react-native';
-import { getMnemonic } from '../services/storageService';
+import { getMnemonic, getPin } from '../services/storageService';
+import { Skeleton } from '../components/Skeleton';
+import { LoadingOverlay } from '../components/LoadingOverlay';
 import { COLORS } from '../constants/theme';
 
 export default function VerifyRecoveryScreen({ navigation }: any) {
   const [fullPhrase, setFullPhrase] = useState<string[]>([]);
   const [shuffled, setShuffled] = useState<string[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [loadingPhrase, setLoadingPhrase] = useState(true);
+  const [verifying, setVerifying] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    getMnemonic().then((phrase) => {
-      if (!phrase) return;
-      const words = phrase.split(' ');
-      setFullPhrase(words);
-      setShuffled([...words].sort(() => Math.random() - 0.5));
-    });
+    getMnemonic()
+      .then((phrase) => {
+        if (!phrase) return;
+        const words = phrase.split(' ');
+        setFullPhrase(words);
+        setShuffled([...words].sort(() => Math.random() - 0.5));
+      })
+      .finally(() => setLoadingPhrase(false));
   }, []);
 
   const pickWord = (word: string) => {
     if (selected.includes(word)) return;
+    setErrorMessage('');
     setSelected([...selected, word]);
   };
 
   const removeWord = (idx: number) => {
+    setErrorMessage('');
     setSelected(selected.filter((_, i) => i !== idx));
   };
 
   const onVerify = () => {
-    const correct = selected.join(' ') === fullPhrase.join(' ');
-    if (correct) {
-      navigation.navigate('SetupPin');
-    } else {
-      Alert.alert('Incorrect', 'The order does not match your recovery phrase. Please try again.');
-      setSelected([]);
-    }
+    setErrorMessage('');
+    setVerifying(true);
+    setTimeout(async () => {
+      const correct = selected.join(' ') === fullPhrase.join(' ');
+      setVerifying(false);
+      if (correct) {
+        const pin = await getPin();
+        if (pin) {
+          navigation.replace('Home');
+        } else {
+          navigation.navigate('SetupPin');
+        }
+      } else {
+        setErrorMessage('Incorrect word order. Please re-enter the words in the exact order you wrote down.');
+        setSelected([]);
+      }
+    }, 150);
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      <LoadingOverlay visible={verifying} message="Verifying recovery phrase…" />
+
       <Text style={styles.title}>Verify Recovery Phrase</Text>
       <Text style={styles.subtitle}>
         Tap the words in the correct order to verify you have written them down.
       </Text>
+
+      {/* Inline Red Error Message */}
+      {errorMessage ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+        </View>
+      ) : null}
 
       {/* Selected words */}
       <View style={styles.selectedBox}>
@@ -59,25 +87,33 @@ export default function VerifyRecoveryScreen({ navigation }: any) {
       </View>
 
       {/* Shuffled word bank */}
-      <View style={styles.wordBank}>
-        {shuffled.map((word, i) => (
-          <TouchableOpacity
-            key={i}
-            style={[styles.wordChip, selected.includes(word) && styles.wordChipUsed]}
-            onPress={() => pickWord(word)}
-            disabled={selected.includes(word)}
-          >
-            <Text style={[styles.wordText, selected.includes(word) && styles.wordTextUsed]}>
-              {word}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {loadingPhrase ? (
+        <View style={styles.wordBank}>
+          {Array.from({ length: 12 }).map((_, i) => (
+            <Skeleton key={i} width={82} height={36} borderRadius={8} />
+          ))}
+        </View>
+      ) : (
+        <View style={styles.wordBank}>
+          {shuffled.map((word, i) => (
+            <TouchableOpacity
+              key={i}
+              style={[styles.wordChip, selected.includes(word) && styles.wordChipUsed]}
+              onPress={() => pickWord(word)}
+              disabled={selected.includes(word)}
+            >
+              <Text style={[styles.wordText, selected.includes(word) && styles.wordTextUsed]}>
+                {word}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       <TouchableOpacity
-        style={[styles.primaryBtn, selected.length !== 12 && styles.disabledBtn]}
+        style={[styles.primaryBtn, (selected.length !== 12 || verifying) && styles.disabledBtn]}
         onPress={onVerify}
-        disabled={selected.length !== 12}
+        disabled={selected.length !== 12 || verifying}
       >
         <Text style={styles.primaryBtnText}>Confirm →</Text>
       </TouchableOpacity>
@@ -86,9 +122,14 @@ export default function VerifyRecoveryScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: COLORS.background, padding: 24, flexGrow: 1 },
+  container: { backgroundColor: COLORS.background, padding: 24, paddingTop: 56, flexGrow: 1 },
   title: { fontSize: 24, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 12 },
   subtitle: { fontSize: 14, color: COLORS.textSecondary, lineHeight: 22, marginBottom: 20 },
+  errorBox: {
+    backgroundColor: '#2D0A0A', borderWidth: 1, borderColor: COLORS.error,
+    borderRadius: 10, padding: 12, marginBottom: 16,
+  },
+  errorText: { color: '#FF6B6B', fontSize: 13, lineHeight: 18, textAlign: 'center' },
   selectedBox: {
     minHeight: 100, backgroundColor: COLORS.card, borderRadius: 12,
     padding: 12, marginBottom: 20, borderWidth: 1, borderColor: COLORS.border,

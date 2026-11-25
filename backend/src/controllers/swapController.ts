@@ -11,6 +11,7 @@ const quoteSchema = z.object({
   buyToken:     z.string().min(2),
   sellAmount:   z.string().min(1),
   takerAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'Invalid address'),
+  chainId:      z.number().optional().default(56),
 });
 
 export const getSwapQuoteHandler = async (req: Request, res: Response, next: NextFunction) => {
@@ -21,6 +22,7 @@ export const getSwapQuoteHandler = async (req: Request, res: Response, next: Nex
       body.buyToken,
       body.sellAmount,
       body.takerAddress,
+      body.chainId,
     );
     res.json(quote);
   } catch (err: any) {
@@ -28,11 +30,11 @@ export const getSwapQuoteHandler = async (req: Request, res: Response, next: Nex
       return res.status(400).json({ error: 'Invalid request', details: err.errors });
     }
     logger.error('Swap quote error', { message: err.message });
-    next(err);
+    res.status(400).json({ error: err.message || 'Could not fetch swap quote' });
   }
 };
 
-// Record a completed swap (called after the mobile app broadcasts the tx)
+// Record a completed swap (called after the mobile app broadcasts the tx locally)
 const recordSchema = z.object({
   txHash:       z.string().min(10),
   takerAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
@@ -42,12 +44,18 @@ const recordSchema = z.object({
   buyAmount:    z.string(),
   lwFeeBps:     z.number().int().min(0),
   lwFeeUSD:     z.string(),
+  chainId:      z.number().optional().default(56),
 });
 
 export const recordSwapHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = recordSchema.parse(req.body);
-    const record = await SwapRecord.create({ ...body, status: 'pending', chainId: 56 });
+    const record = await SwapRecord.create({
+      ...body,
+      status: 'confirmed',
+      chainId: body.chainId,
+    });
+
     // Also record in the general transaction log
     await Transaction.create({
       txHash: body.txHash,
@@ -55,10 +63,15 @@ export const recordSwapHandler = async (req: Request, res: Response, next: NextF
       fromAddress: body.takerAddress,
       tokenSymbol: body.sellToken,
       amount: body.sellAmount,
-      chainId: 56,
-      status: 'pending',
-      metadata: { buyToken: body.buyToken, buyAmount: body.buyAmount },
+      chainId: body.chainId,
+      status: 'confirmed',
+      metadata: {
+        buyToken: body.buyToken,
+        buyAmount: body.buyAmount,
+        provider: body.chainId === 97 ? 'PancakeSwap' : '0x',
+      },
     });
+
     res.status(201).json({ id: record._id, txHash: record.txHash });
   } catch (err: any) {
     if (err.name === 'ZodError') {

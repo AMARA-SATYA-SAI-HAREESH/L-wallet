@@ -17,12 +17,18 @@ const createSchema = z.object({
 export const createTransaction = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = createSchema.parse(req.body);
-    const tx = await Transaction.create(body);
+    // Use findOneAndUpdate with upsert to prevent duplicate txHash errors
+    const tx = await Transaction.findOneAndUpdate(
+      { txHash: body.txHash },
+      { $set: body },
+      { upsert: true, new: true },
+    );
     res.status(201).json(tx);
   } catch (err: any) {
     if (err.name === 'ZodError') {
       return res.status(400).json({ error: 'Invalid request', details: err.errors });
     }
+    logger.error('Error creating transaction', { error: err.message });
     next(err);
   }
 };
@@ -30,10 +36,26 @@ export const createTransaction = async (req: Request, res: Response, next: NextF
 export const getTransactions = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { address } = req.query;
-    if (!address) return res.status(400).json({ error: 'address is required' });
-    const txs = await Transaction.find({ fromAddress: address }).sort({ createdAt: -1 }).limit(50);
+    if (!address || typeof address !== 'string') {
+      return res.status(400).json({ error: 'address query param is required' });
+    }
+
+    // Match both sender and recipient case-insensitively
+    const escaped = address.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`^${escaped}$`, 'i');
+
+    const txs = await Transaction.find({
+      $or: [
+        { fromAddress: { $regex: regex } },
+        { toAddress: { $regex: regex } },
+      ],
+    })
+      .sort({ createdAt: -1 })
+      .limit(50);
+
     res.json(txs);
-  } catch (err) {
+  } catch (err: any) {
+    logger.error('Error fetching transactions', { error: err.message });
     next(err);
   }
 };
